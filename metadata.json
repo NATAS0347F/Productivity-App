@@ -1,0 +1,6 @@
+{
+  "name": "Flow — Adaptive Planner",
+  "description": "Turn your chaotic brain dump into a realistic day with adaptive capacity-aware scheduling and focus breaks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
