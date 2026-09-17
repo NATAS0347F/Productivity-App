@@ -64,8 +64,10 @@ import {
 } from './utils/storage';
 import { calculateMomentum } from './utils/momentum';
 import { applyThemeToDocument, getLuminance } from './utils/theme';
+import { initGlobalButtonSound } from './utils/sound';
 
 import { Header } from './components/Header';
+import { DashboardGreeting } from './components/DashboardGreeting';
 import { NowCard } from './components/NowCard';
 import { NextCard } from './components/NextCard';
 import { TodayProgressCard } from './components/TodayProgressCard';
@@ -96,6 +98,7 @@ import { GlobalQuickCaptureModal } from './components/GlobalQuickCaptureModal';
 import { ThemeStudioModal } from './components/ThemeStudioModal';
 import { CategoryManagerModal } from './components/CategoryManagerModal';
 import { ResetConfirmModal } from './components/ResetConfirmModal';
+import { BeginnerManualModal } from './components/BeginnerManualModal';
 
 import { ChevronDown, ChevronUp, Sliders, Plus, Sparkles, Compass } from 'lucide-react';
 
@@ -143,6 +146,13 @@ export default function App() {
   const [isThemeStudioOpen, setIsThemeStudioOpen] = useState(false);
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
+  const [isBeginnerManualOpen, setIsBeginnerManualOpen] = useState(false);
+
+  // Global relaxing acoustic click listener for all buttons and interactive controls
+  useEffect(() => {
+    const cleanup = initGlobalButtonSound();
+    return cleanup;
+  }, []);
 
   // V6 Theme & Aesthetic Customization State
   const [theme, setTheme] = useState<ThemeSettings>(() => loadThemeSettings());
@@ -612,6 +622,7 @@ export default function App() {
           onOpenThemeStudio={() => setIsThemeStudioOpen(true)}
           onOpenCategories={() => setIsCategoriesOpen(true)}
           onOpenReset={() => setIsResetOpen(true)}
+          onOpenBeginnerManual={() => setIsBeginnerManualOpen(true)}
           onQuickAdd={() => setIsQuickCaptureOpen(true)}
           activeTheme={theme.name}
           profile={profile}
@@ -624,6 +635,13 @@ export default function App() {
         {/* TODAY VIEW: ACTION FIRST -> PLANNING SECOND -> MOTIVATION LAST */}
         {viewMode === 'today' && (
           <div className="space-y-5">
+            {/* Interactive Personalized Greeting & Quote Cycler */}
+            <DashboardGreeting
+              userProfile={profile}
+              onUpdateProfile={setProfile}
+              onOpenBeginnerManual={() => setIsBeginnerManualOpen(true)}
+            />
+
             {/* Subtle intentional theme badge (Non-intrusive, never pushes schedule down) */}
             {thisWeekPlan.theme && (
               <div className="flex items-center justify-between px-4 py-2 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-xs shadow-2xs">
@@ -970,6 +988,7 @@ export default function App() {
         tasksCount={tasks.length}
         onReloadAllData={handleReloadAllData}
         onOpenThemeStudio={() => setIsThemeStudioOpen(true)}
+        onOpenBeginnerManual={() => setIsBeginnerManualOpen(true)}
         activeThemeName={theme.name}
       />
 
@@ -1006,6 +1025,13 @@ export default function App() {
         monthPlan={monthPlan}
         tasks={tasks}
         onSaveMonthPlan={setMonthPlan}
+      />
+
+      {/* Beginner User Manual & Guide Modal */}
+      <BeginnerManualModal
+        isOpen={isBeginnerManualOpen}
+        onClose={() => setIsBeginnerManualOpen(false)}
+        userName={profile.name}
       />
     </div>
   );

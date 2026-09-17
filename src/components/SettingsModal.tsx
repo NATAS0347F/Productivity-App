@@ -12,6 +12,7 @@ import {
   HardDrive,
   Palette,
   ChevronRight,
+  BookOpen,
 } from 'lucide-react';
 import { UserProfile, Task } from '../types';
 import { downloadBackupFile, importDataFromJson, STORAGE_KEYS } from '../utils/storage';
@@ -24,6 +25,7 @@ interface SettingsModalProps {
   tasksCount: number;
   onReloadAllData: () => void;
   onOpenThemeStudio?: () => void;
+  onOpenBeginnerManual?: () => void;
   activeThemeName?: string;
 }
 
@@ -35,6 +37,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   tasksCount,
   onReloadAllData,
   onOpenThemeStudio,
+  onOpenBeginnerManual,
   activeThemeName,
 }) => {
   if (!isOpen) return null;
@@ -161,6 +164,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
             </div>
           </form>
+
+          {/* Beginner's Guide & Manual */}
+          {onOpenBeginnerManual && (
+            <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200/90 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Beginner's Guide & Manual</span>
+                </span>
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full uppercase font-mono">
+                  Quick Tour
+                </span>
+              </div>
+              <p className="text-xs text-stone-500 leading-relaxed">
+                New to Flow? Learn about capacity planning, draggable timelines, single-task focus, and how to conquer overwhelming days.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenBeginnerManual();
+                }}
+                className="w-full py-2 px-3 rounded-xl bg-white hover:bg-stone-100 border border-stone-200 text-stone-800 text-xs font-bold transition-colors cursor-pointer flex items-center justify-between shadow-2xs"
+              >
+                <span>Open User Manual</span>
+                <ChevronRight className="w-4 h-4 text-stone-400" />
+              </button>
+            </div>
+          )}
 
           {/* Theme & Appearance Section */}
           {onOpenThemeStudio && (

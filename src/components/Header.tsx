@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Volume2,
   VolumeX,
+  BookOpen,
 } from 'lucide-react';
 import { ViewMode, UserProfile, EnergyLevel } from '../types';
 import { SavedIndicator } from './SavedIndicator';
@@ -29,6 +30,7 @@ interface HeaderProps {
   onOpenThemeStudio?: () => void;
   onOpenCategories?: () => void;
   onOpenReset?: () => void;
+  onOpenBeginnerManual?: () => void;
   onQuickAdd?: () => void;
   activeTheme?: string;
   profile: UserProfile;
@@ -47,6 +49,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenThemeStudio,
   onOpenCategories,
   onOpenReset,
+  onOpenBeginnerManual,
   onQuickAdd,
   activeTheme,
   profile,
@@ -288,6 +291,20 @@ export const Header: React.FC<HeaderProps> = ({
           >
             {soundOn ? <Volume2 className="w-4 h-4 text-amber-600" /> : <VolumeX className="w-4 h-4" />}
           </button>
+
+          {/* Beginner's Guide & Manual */}
+          {onOpenBeginnerManual && (
+            <button
+              id="btn-header-guide"
+              type="button"
+              onClick={onOpenBeginnerManual}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white hover:bg-stone-50 border border-stone-200 text-stone-700 hover:text-stone-900 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+              title="Open Beginner Manual & Guide"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-amber-600" />
+              <span className="hidden xl:inline">Guide</span>
+            </button>
+          )}
 
           {/* Settings & Backup Trigger */}
           <button

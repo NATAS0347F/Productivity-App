@@ -221,3 +221,37 @@ export function playTabSound(): void {
     // Ignore error
   }
 }
+
+/**
+ * Attaches a global listener to ensure EVERY button or interactive control
+ * across the entire application triggers an organic, relaxing sound effect on click.
+ */
+export function initGlobalButtonSound(): () => void {
+  if (typeof window === 'undefined') return () => {};
+
+  let lastClickTime = 0;
+
+  const handleClick = (e: MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+
+    // Check if clicked element or its parent is a button or clickable control
+    const clickable = target.closest(
+      'button, [role="button"], a[href], input[type="submit"], input[type="button"], input[type="checkbox"], summary'
+    );
+
+    if (clickable) {
+      // Debounce slightly to prevent double clicks within 50ms
+      const now = Date.now();
+      if (now - lastClickTime < 50) return;
+      lastClickTime = now;
+
+      playRelaxingClick();
+    }
+  };
+
+  window.addEventListener('click', handleClick, { capture: true, passive: true });
+  return () => {
+    window.removeEventListener('click', handleClick, { capture: true });
+  };
+}
