@@ -11,6 +11,8 @@ import {
   ThemeSettings,
   CategoryDefinition,
   VisionBoardItem,
+  VisionCategory,
+  VisionBoardLayoutSettings,
 } from '../types';
 import { INITIAL_TASKS } from '../data/initialTasks';
 import { DEFAULT_MONTH_COVER, DEFAULT_WEEK_COVER } from './covers';
@@ -32,6 +34,8 @@ export const STORAGE_KEYS = {
   SAVED_THEMES: 'flow_v6_saved_themes',
   CATEGORIES: 'flow_v6_categories',
   VISION_BOARD: 'flow_v6_vision_board',
+  VISION_CATEGORIES: 'flow_v6_vision_categories',
+  VISION_LAYOUT: 'flow_v6_vision_layout',
 };
 
 // Legacy keys to migrate from if present
@@ -769,6 +773,66 @@ export function saveVisionBoardItems(items: VisionBoardItem[]): void {
 export function resetVisionBoard(): VisionBoardItem[] {
   setStored(STORAGE_KEYS.VISION_BOARD, DEFAULT_VISION_BOARD_ITEMS);
   return DEFAULT_VISION_BOARD_ITEMS;
+}
+
+// -------------------------------------------------------------
+// Vision Board Categories & Layout Preferences Storage
+// -------------------------------------------------------------
+
+export const DEFAULT_VISION_CATEGORIES: VisionCategory[] = [
+  { id: 'mindset', name: 'Mindset & Mood', emoji: '✨', color: '#8B5CF6', description: 'Internal peace, presence & mindset', isDefault: true },
+  { id: 'career', name: 'Career & Ambition', emoji: '🚀', color: '#3B82F6', description: 'Professional craft & impact', isDefault: true },
+  { id: 'aesthetic', name: 'Aesthetic & Life', emoji: '🌿', color: '#10B981', description: 'Environment, spaces & style', isDefault: true },
+  { id: 'health', name: 'Health & Wellness', emoji: '☀️', color: '#F59E0B', description: 'Vitality, energy & movement', isDefault: true },
+  { id: 'projects', name: 'Dream Projects', emoji: '💡', color: '#EC4899', description: 'Creative works & ventures', isDefault: true },
+  { id: 'travel', name: 'Travel & Adventure', emoji: '✈️', color: '#06B6D4', description: 'Exploration & journeys', isDefault: true },
+];
+
+export const DEFAULT_VISION_LAYOUT: VisionBoardLayoutSettings = {
+  mode: 'masonry',
+  columns: 3,
+  gap: 'normal',
+  aspectRatioOverride: 'original',
+  showAffirmation: true,
+  showCaption: true,
+  showLinkedGoal: true,
+  cardRounding: 'rounded',
+};
+
+export function loadVisionCategories(): VisionCategory[] {
+  const existing = getStored<VisionCategory[] | null>(STORAGE_KEYS.VISION_CATEGORIES, null);
+  if (existing && Array.isArray(existing) && existing.length > 0) {
+    return existing;
+  }
+  setStored(STORAGE_KEYS.VISION_CATEGORIES, DEFAULT_VISION_CATEGORIES);
+  return DEFAULT_VISION_CATEGORIES;
+}
+
+export function saveVisionCategories(categories: VisionCategory[]): void {
+  setStored(STORAGE_KEYS.VISION_CATEGORIES, categories);
+}
+
+export function resetVisionCategories(): VisionCategory[] {
+  setStored(STORAGE_KEYS.VISION_CATEGORIES, DEFAULT_VISION_CATEGORIES);
+  return DEFAULT_VISION_CATEGORIES;
+}
+
+export function loadVisionLayout(): VisionBoardLayoutSettings {
+  const existing = getStored<VisionBoardLayoutSettings | null>(STORAGE_KEYS.VISION_LAYOUT, null);
+  if (existing && existing.mode) {
+    return { ...DEFAULT_VISION_LAYOUT, ...existing };
+  }
+  setStored(STORAGE_KEYS.VISION_LAYOUT, DEFAULT_VISION_LAYOUT);
+  return DEFAULT_VISION_LAYOUT;
+}
+
+export function saveVisionLayout(layout: VisionBoardLayoutSettings): void {
+  setStored(STORAGE_KEYS.VISION_LAYOUT, layout);
+}
+
+export function resetVisionLayout(): VisionBoardLayoutSettings {
+  setStored(STORAGE_KEYS.VISION_LAYOUT, DEFAULT_VISION_LAYOUT);
+  return DEFAULT_VISION_LAYOUT;
 }
 
 export const EMPTY_MONTH_PLAN: MonthPlan = {

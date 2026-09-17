@@ -126,14 +126,40 @@ export function scoreTask(task: Task, capacityLevel: CapacitySettings['capacityL
   return score;
 }
 
+export function isSameCalendarDay(d1: Date, d2: Date): boolean {
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
+}
+
 export function generateSchedule(
   tasks: Task[],
   capacity: CapacitySettings,
-  targetDate: Date = new Date()
+  targetDate: Date = new Date(),
+  startFromCurrentTime: boolean = true
 ): ScheduleResult {
   const currentDayOfWeek = targetDate.getDay();
-  const start = timeToMinutes(capacity.startTime);
-  const end = timeToMinutes(capacity.endTime);
+  const now = new Date();
+  const isToday = isSameCalendarDay(targetDate, now);
+
+  let start = timeToMinutes(capacity.startTime);
+  let end = timeToMinutes(capacity.endTime);
+
+  // If scheduling for today and user wants to start from the current time:
+  if (isToday && startFromCurrentTime) {
+    const currentNowMin = now.getHours() * 60 + now.getMinutes();
+    // Round to previous 15-min mark so active block aligns cleanly with right now
+    const roundedNow = Math.floor(currentNowMin / 15) * 15;
+    start = Math.max(0, roundedNow);
+
+    // If current time is close to or past the standard end time, dynamically extend window
+    if (end <= start + 120) {
+      end = Math.min(24 * 60, start + 240); // 4 hours from now
+    }
+  }
+
   const totalWindow = Math.max(0, end - start);
 
   // Maximum tasks allowed based on Capacity Level (anti-burnout safeguard)
@@ -371,3 +397,22 @@ export function generateSchedule(
     isOverloaded,
   };
 }
+
+/**
+ * Recalculates consecutive start times when activities are dragged or reordered
+ */
+export function recalculateBlockTimes(
+  blocks: ScheduleBlock[],
+  startMinutes: number
+): ScheduleBlock[] {
+  let current = startMinutes;
+  return blocks.map((block) => {
+    const updated: ScheduleBlock = {
+      ...block,
+      start: current,
+    };
+    current += block.duration;
+    return updated;
+  });
+}
+

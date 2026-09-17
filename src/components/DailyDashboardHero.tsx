@@ -12,6 +12,8 @@ import {
   ArrowRight,
   Flame,
   Check,
+  Edit2,
+  RefreshCw,
 } from 'lucide-react';
 import {
   Task,
@@ -27,6 +29,7 @@ import { CATEGORY_CONFIG } from '../utils/categories';
 interface DailyDashboardHeroProps {
   userProfile: UserProfile;
   onUpdateEnergy: (energy: EnergyLevel) => void;
+  onUpdateProfile?: (profile: UserProfile) => void;
   tasks: Task[];
   capacity: CapacitySettings;
   scheduleResult: ScheduleResult | null;
@@ -36,9 +39,21 @@ interface DailyDashboardHeroProps {
   onToggleTask: (id: number) => void;
 }
 
+const INSPIRING_QUOTES = [
+  { text: 'ready for a great day?', emoji: '✨', advice: 'Take it one intentional step at a time.' },
+  { text: 'ready to make today count?', emoji: '🎯', advice: 'Pick one priority first and protect your focus.' },
+  { text: 'steady progress beats perfection every time.', emoji: '🌱', advice: 'Small consistent blocks add up to massive momentum.' },
+  { text: 'one intentional step at a time.', emoji: '🪴', advice: 'You do not need to do everything at once. Just start gently.' },
+  { text: 'protect your mental peace and make space for what matters.', emoji: '☕', advice: 'Guard your bandwidth like the rare asset it is.' },
+  { text: "what's the one thing that will give you momentum today?", emoji: '🚀', advice: 'Conquer the hardest friction point first.' },
+  { text: 'take a deep breath — today is full of possibilities.', emoji: '🌤️', advice: 'Be kind to your energy rhythms.' },
+  { text: 'clarity comes from taking action, not overthinking.', emoji: '💡', advice: 'Start for just 5 minutes and let the momentum follow.' },
+];
+
 export const DailyDashboardHero: React.FC<DailyDashboardHeroProps> = ({
   userProfile,
   onUpdateEnergy,
+  onUpdateProfile,
   tasks,
   capacity,
   scheduleResult,
@@ -49,6 +64,13 @@ export const DailyDashboardHero: React.FC<DailyDashboardHeroProps> = ({
 }) => {
   // Real-time clock updating every 10 seconds
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [quoteIndex, setQuoteIndex] = useState(0);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState(userProfile.name || 'Friend');
+
+  useEffect(() => {
+    setNameInput(userProfile.name || 'Friend');
+  }, [userProfile.name]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -63,10 +85,27 @@ export const DailyDashboardHero: React.FC<DailyDashboardHeroProps> = ({
     minute: '2-digit',
   });
 
-  // Greeting based on hour
+  // Time of day badge
   const hour = currentTime.getHours();
-  const greetingTime = hour < 12 ? 'GOOD MORNING' : hour < 17 ? 'GOOD AFTERNOON' : 'GOOD EVENING';
-  const userName = userProfile.name?.toUpperCase() || 'NAT';
+  const timeOfDayTag = hour < 12 ? '☀️ Morning Focus' : hour < 17 ? '🌤️ Afternoon Flow' : '🌙 Evening Wind-down';
+  const rawName = userProfile.name?.trim() || 'Friend';
+  const activeQuote = INSPIRING_QUOTES[quoteIndex % INSPIRING_QUOTES.length];
+
+  const handleSaveName = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = nameInput.trim() || 'Friend';
+    if (onUpdateProfile) {
+      onUpdateProfile({
+        ...userProfile,
+        name: trimmed,
+      });
+    }
+    setIsEditingName(false);
+  };
+
+  const cycleQuote = () => {
+    setQuoteIndex((prev) => (prev + 1) % INSPIRING_QUOTES.length);
+  };
 
   // Task calculations
   const allTasks = tasks.filter((t) => t.type === 'task');
@@ -113,14 +152,79 @@ export const DailyDashboardHero: React.FC<DailyDashboardHeroProps> = ({
     <div id="daily-dashboard-hero" className="space-y-4 mb-6">
       {/* Top Greeting & Energy Check-in */}
       <div className="bg-linear-to-r from-white via-[#faf9f6] to-[#f4f2eb] border border-[#e5e1d8] rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#1e1e1e]">
-              {greetingTime}, {userName} 🌱
-            </h1>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-stone-200/80 text-stone-600 font-mono">
+              {timeOfDayTag}
+            </span>
+            <span className="text-stone-300">·</span>
+            <span className="text-[11px] font-medium text-stone-500 font-mono">
+              {timeFormatted}
+            </span>
           </div>
-          <p className="text-xs sm:text-sm text-[#666] mt-0.5">
-            Let’s protect your mental bandwidth and focus on what truly matters.
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {isEditingName ? (
+              <form onSubmit={handleSaveName} className="flex items-center gap-1.5 my-1">
+                <span className="text-lg sm:text-2xl font-black text-[#1e1e1e]">Hello</span>
+                <input
+                  type="text"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  placeholder="Your Name"
+                  autoFocus
+                  className="px-2 py-0.5 bg-white border border-stone-300 rounded-lg text-sm sm:text-lg font-bold text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500 w-32 sm:w-44"
+                />
+                <button
+                  type="submit"
+                  className="p-1.5 rounded-lg bg-stone-900 text-white hover:bg-stone-800 text-xs font-bold"
+                  title="Save Name"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNameInput(rawName);
+                    setIsEditingName(false);
+                  }}
+                  className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 text-xs"
+                >
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#1e1e1e] flex items-center gap-2 flex-wrap">
+                <span>Hello</span>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingName(true)}
+                  className="inline-flex items-center gap-1 text-stone-900 hover:text-amber-800 border-b-2 border-dashed border-stone-300 hover:border-amber-600 transition-colors group cursor-pointer"
+                  title="Click to change your name"
+                >
+                  <span>{rawName}</span>
+                  <Edit2 className="w-3 h-3 text-stone-400 group-hover:text-amber-600 opacity-60 group-hover:opacity-100 transition-opacity" />
+                </button>
+                <span className="text-stone-300">,</span>
+                <span className="text-stone-700 font-semibold">{activeQuote.text}</span>
+                <span className="text-base select-none">{activeQuote.emoji}</span>
+              </h1>
+            )}
+
+            {/* Quote cycler */}
+            <button
+              type="button"
+              onClick={cycleQuote}
+              className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 transition-colors cursor-pointer"
+              title="See another inspiring quote"
+            >
+              <RefreshCw className="w-3.5 h-3.5 transition-transform hover:rotate-180 duration-500" />
+            </button>
+          </div>
+
+          <p className="text-xs sm:text-sm text-[#666] mt-1 flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <span>{activeQuote.advice}</span>
           </p>
         </div>
 

@@ -18,9 +18,10 @@ import {
   X,
   Check,
 } from 'lucide-react';
-import { MonthPlan, Task, AestheticCover } from '../types';
+import { MonthPlan, Task, AestheticCover, CategoryDefinition } from '../types';
 import { CATEGORY_CONFIG } from '../utils/categories';
 import { CoverModal } from './CoverModal';
+import { AddCalendarEventModal } from './AddCalendarEventModal';
 
 interface MonthlyViewProps {
   monthPlan: MonthPlan;
@@ -30,6 +31,8 @@ interface MonthlyViewProps {
   onToggleTask: (id: number) => void;
   onOpenPlanMonth?: () => void;
   onQuickAddTask?: () => void;
+  onAddTask?: (task: Omit<Task, 'id' | 'completed' | 'createdAt' | 'postponeCount'>) => void;
+  categories?: CategoryDefinition[];
 }
 
 export const MonthlyView: React.FC<MonthlyViewProps> = ({
@@ -40,9 +43,14 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({
   onToggleTask,
   onOpenPlanMonth,
   onQuickAddTask,
+  onAddTask,
+  categories = [],
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
+  const [isAddEventOpen, setIsAddEventOpen] = useState(false);
+  const [targetDateForEvent, setTargetDateForEvent] = useState<string>('');
+  const [inspectedDay, setInspectedDay] = useState<{ date: string; tasks: Task[] } | null>(null);
   const [editingGoalIndex, setEditingGoalIndex] = useState<number | null>(null);
   const [editingGoalText, setEditingGoalText] = useState('');
   const [newGoalText, setNewGoalText] = useState('');
@@ -507,14 +515,17 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({
 
           <div className="mt-4 pt-3 border-t border-stone-100 text-[11px] text-stone-400 flex items-center justify-between">
             <span>Filtered for clarity — micro tasks remain in weekly views.</span>
-            {onQuickAddTask && (
-              <button
-                onClick={onQuickAddTask}
-                className="text-stone-700 font-bold hover:underline cursor-pointer"
-              >
-                + Add key date
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setTargetDateForEvent(new Date().toISOString().slice(0, 10));
+                setIsAddEventOpen(true);
+              }}
+              className="text-rose-700 font-bold hover:underline cursor-pointer flex items-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Add key date</span>
+            </button>
           </div>
         </div>
 
@@ -596,30 +607,48 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({
 
       {/* 3. CALENDAR OVERVIEW GRID (Quiet, clean overview) */}
       <div className="bg-white/95 border border-stone-200/90 rounded-3xl p-5 shadow-xs">
-        <div className="flex items-center justify-between pb-3 mb-3 border-b border-stone-100">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 mb-3 border-b border-stone-100 gap-2">
           <div className="flex items-center gap-2">
             <CalendarIcon className="w-4 h-4 text-stone-600" />
             <h3 className="text-sm font-bold text-stone-900">{monthName} Calendar Grid</h3>
+            <span className="text-xs text-stone-400 font-medium">Click any date to add event</span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
             <button
-              onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
-              className="p-1.5 rounded-xl border border-stone-200 hover:bg-stone-50 text-stone-700 cursor-pointer"
+              type="button"
+              id="btn-add-calendar-event"
+              onClick={() => {
+                setTargetDateForEvent(new Date().toISOString().slice(0, 10));
+                setIsAddEventOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer"
             >
-              <ChevronLeft className="w-3.5 h-3.5" />
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Add Event</span>
             </button>
-            <button
-              onClick={() => setCurrentDate(new Date())}
-              className="px-2.5 py-1 rounded-xl text-xs font-bold bg-stone-100 hover:bg-stone-200 text-stone-800 cursor-pointer"
-            >
-              Today
-            </button>
-            <button
-              onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
-              className="p-1.5 rounded-xl border border-stone-200 hover:bg-stone-50 text-stone-700 cursor-pointer"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
+                className="p-1.5 rounded-xl border border-stone-200 hover:bg-stone-50 text-stone-700 cursor-pointer"
+                title="Previous month"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setCurrentDate(new Date())}
+                className="px-2.5 py-1 rounded-xl text-xs font-bold bg-stone-100 hover:bg-stone-200 text-stone-800 cursor-pointer"
+              >
+                Today
+              </button>
+              <button
+                onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
+                className="p-1.5 rounded-xl border border-stone-200 hover:bg-stone-50 text-stone-700 cursor-pointer"
+                title="Next month"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -646,11 +675,16 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({
             return (
               <div
                 key={dStr}
-                className={`min-h-16 rounded-2xl p-1.5 border transition-all text-left flex flex-col justify-between ${
+                onClick={() => {
+                  setTargetDateForEvent(dStr);
+                  setIsAddEventOpen(true);
+                }}
+                className={`min-h-16 rounded-2xl p-1.5 border transition-all text-left flex flex-col justify-between group cursor-pointer relative ${
                   isToday
-                    ? 'bg-amber-50/40 border-amber-300 ring-2 ring-amber-300/40'
-                    : 'bg-stone-50/60 border-stone-200/80 hover:bg-white'
+                    ? 'bg-amber-50/40 border-amber-300 ring-2 ring-amber-300/40 hover:bg-amber-50/70'
+                    : 'bg-stone-50/60 border-stone-200/80 hover:bg-white hover:border-stone-400 hover:shadow-2xs'
                 }`}
+                title={`Click to add event on ${dStr}`}
               >
                 <div className="flex items-center justify-between">
                   <span
@@ -660,25 +694,41 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({
                   >
                     {d.getDate()}
                   </span>
-                  {dayKeyTasks.length > 0 && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                  )}
+
+                  <div className="flex items-center gap-1">
+                    {dayKeyTasks.length > 0 && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                    )}
+                    <span className="w-4 h-4 rounded-md flex items-center justify-center text-stone-400 opacity-0 group-hover:opacity-100 hover:bg-stone-200 hover:text-stone-800 transition-all text-[11px] font-bold">
+                      +
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-0.5 mt-1 overflow-hidden">
                   {dayKeyTasks.slice(0, 2).map((t) => (
                     <div
                       key={t.id}
-                      onClick={() => onSelectTask(t)}
-                      className="truncate text-[10px] px-1 py-0.5 rounded bg-white border border-stone-200 text-stone-800 font-semibold cursor-pointer hover:border-stone-400"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectTask(t);
+                      }}
+                      className="truncate text-[10px] px-1 py-0.5 rounded bg-white border border-stone-200 text-stone-800 font-semibold cursor-pointer hover:border-stone-500 shadow-2xs"
                     >
                       {t.name}
                     </div>
                   ))}
                   {dayKeyTasks.length > 2 && (
-                    <div className="text-[9px] text-stone-400 font-medium pl-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInspectedDay({ date: dStr, tasks: dayKeyTasks });
+                      }}
+                      className="text-[9px] text-stone-500 font-bold pl-1 hover:underline cursor-pointer text-left block"
+                    >
                       +{dayKeyTasks.length - 2} more
-                    </div>
+                    </button>
                   )}
                 </div>
               </div>
@@ -686,6 +736,94 @@ export const MonthlyView: React.FC<MonthlyViewProps> = ({
           })}
         </div>
       </div>
+
+      {/* Inspected Day Details Modal */}
+      {inspectedDay && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setInspectedDay(null)}
+        >
+          <div
+            className="bg-white border border-stone-200 text-stone-900 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="w-4 h-4 text-stone-700" />
+                <h3 className="text-sm font-bold text-stone-900">
+                  Events for {new Date(inspectedDay.date + 'T00:00:00').toLocaleDateString(undefined, {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </h3>
+              </div>
+              <button
+                onClick={() => setInspectedDay(null)}
+                className="p-1 text-stone-400 hover:text-stone-700 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {inspectedDay.tasks.map((task) => (
+                <div
+                  key={task.id}
+                  onClick={() => {
+                    setInspectedDay(null);
+                    onSelectTask(task);
+                  }}
+                  className="p-2.5 rounded-xl border border-stone-200 hover:border-stone-400 bg-stone-50 flex items-center justify-between text-xs cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="font-bold text-stone-900 truncate">{task.name}</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-stone-500">
+                    {task.duration}m
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-stone-100 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setInspectedDay(null)}
+                className="px-3 py-1.5 text-xs font-semibold text-stone-500 hover:text-stone-800"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const d = inspectedDay.date;
+                  setInspectedDay(null);
+                  setTargetDateForEvent(d);
+                  setIsAddEventOpen(true);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-stone-900 text-white text-xs font-bold hover:bg-stone-800 flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Add event to this day</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Calendar Event Modal */}
+      <AddCalendarEventModal
+        isOpen={isAddEventOpen}
+        onClose={() => setIsAddEventOpen(false)}
+        onAddEvent={(taskData) => {
+          if (onAddTask) {
+            onAddTask(taskData);
+          }
+        }}
+        initialDate={targetDateForEvent}
+        categories={categories}
+      />
 
       {/* Cover Customizer Modal */}
       <CoverModal

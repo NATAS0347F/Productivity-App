@@ -1,4 +1,5 @@
 import { CategoryType } from '../types';
+export { DEFAULT_CATEGORIES } from './storage';
 
 export interface CategoryStyle {
   key: CategoryType | 'break' | 'free' | 'meal';
@@ -155,6 +156,56 @@ export function getCategoryBadgeStyle(
     text: accent,
     border: `${accent}33`, // 20% opacity border
     accent,
+  };
+}
+
+export function getCategoryStyle(
+  categoryKey: string,
+  categoriesList?: { id: string; name: string; emoji: string; color: string; description?: string }[]
+): CategoryStyle {
+  // Check if standard break / meal / free block
+  if (categoryKey === 'break' || categoryKey === 'meal' || categoryKey === 'free') {
+    return CATEGORY_CONFIG[categoryKey];
+  }
+
+  // Check user categories list
+  if (categoriesList && categoriesList.length > 0) {
+    const found = categoriesList.find((c) => c.id === categoryKey);
+    if (found) {
+      const col = found.color || '#64748B';
+      return {
+        key: found.id,
+        label: found.name,
+        emoji: found.emoji || '🏷️',
+        badgeBg: `${col}15`,
+        badgeBorder: `${col}35`,
+        badgeText: col,
+        blockBorderLeft: `border-l-[${col}]`,
+        blockBg: `${col}08`,
+        description: found.description || '',
+      };
+    }
+  }
+
+  // Check default CATEGORY_CONFIG
+  if (CATEGORY_CONFIG[categoryKey as keyof typeof CATEGORY_CONFIG]) {
+    return CATEGORY_CONFIG[categoryKey as keyof typeof CATEGORY_CONFIG];
+  }
+
+  // Fallback for custom or unmapped string
+  const capitalized = categoryKey
+    ? categoryKey.charAt(0).toUpperCase() + categoryKey.slice(1).replace(/_/g, ' ')
+    : 'General';
+  return {
+    key: categoryKey || 'admin',
+    label: capitalized,
+    emoji: '🏷️',
+    badgeBg: 'bg-stone-100',
+    badgeBorder: 'border-stone-200',
+    badgeText: 'text-stone-700',
+    blockBorderLeft: 'border-l-stone-400',
+    blockBg: 'bg-stone-50',
+    description: '',
   };
 }
 

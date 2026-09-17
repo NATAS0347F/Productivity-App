@@ -13,9 +13,12 @@ import {
   Image as ImageIcon,
   Tag,
   RotateCcw,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { ViewMode, UserProfile, EnergyLevel } from '../types';
 import { SavedIndicator } from './SavedIndicator';
+import { isSoundEnabled, toggleSound, playRelaxingClick, playTabSound } from '../utils/sound';
 
 interface HeaderProps {
   viewMode: ViewMode;
@@ -54,6 +57,12 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   // Live clock updating every 5 seconds for prominent time display
   const [now, setNow] = useState<Date>(new Date());
+  const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
+
+  const handleToggleSound = () => {
+    const next = toggleSound();
+    setSoundOn(next);
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 5000);
@@ -101,7 +110,10 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <button
               id="btn-view-today"
-              onClick={() => onViewModeChange('today')}
+              onClick={() => {
+                playTabSound();
+                onViewModeChange('today');
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 viewMode === 'today'
                   ? 'bg-white text-stone-900 shadow-2xs'
@@ -114,7 +126,10 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               id="btn-view-week"
-              onClick={() => onViewModeChange('week')}
+              onClick={() => {
+                playTabSound();
+                onViewModeChange('week');
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 viewMode === 'week'
                   ? 'bg-white text-stone-900 shadow-2xs'
@@ -127,7 +142,10 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               id="btn-view-month"
-              onClick={() => onViewModeChange('month')}
+              onClick={() => {
+                playTabSound();
+                onViewModeChange('month');
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 viewMode === 'month'
                   ? 'bg-white text-stone-900 shadow-2xs'
@@ -140,7 +158,10 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               id="btn-view-big-picture"
-              onClick={() => onViewModeChange('big_picture' as any)}
+              onClick={() => {
+                playTabSound();
+                onViewModeChange('big_picture' as any);
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 (viewMode as any) === 'big_picture'
                   ? 'bg-white text-stone-900 shadow-2xs'
@@ -154,7 +175,10 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               id="btn-view-vision"
-              onClick={() => onViewModeChange('vision')}
+              onClick={() => {
+                playTabSound();
+                onViewModeChange('vision');
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 viewMode === 'vision'
                   ? 'bg-white text-stone-900 shadow-2xs'
@@ -248,6 +272,21 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Moon className="w-3.5 h-3.5 text-purple-600" />
             <span>Reflect</span>
+          </button>
+
+          {/* Relaxing Sound Effects Toggle */}
+          <button
+            id="btn-toggle-sound"
+            type="button"
+            onClick={handleToggleSound}
+            className={`p-2 rounded-xl border transition-colors cursor-pointer shadow-2xs flex items-center gap-1 ${
+              soundOn
+                ? 'bg-amber-50/90 border-amber-200 text-amber-800'
+                : 'bg-white border-stone-200 text-stone-400 hover:text-stone-700 hover:bg-stone-50'
+            }`}
+            title={soundOn ? 'Sound Effects: Relaxing Chimes Enabled' : 'Sound Effects: Muted (Click to enable)'}
+          >
+            {soundOn ? <Volume2 className="w-4 h-4 text-amber-600" /> : <VolumeX className="w-4 h-4" />}
           </button>
 
           {/* Settings & Backup Trigger */}

@@ -244,6 +244,16 @@ export default function App() {
     setLastSavedAt(Date.now());
   };
 
+  const handleAddCategory = (newCat: CategoryDefinition) => {
+    setCategories((prev) => {
+      const exists = prev.some((c) => c.id === newCat.id);
+      const updated = exists ? prev.map((c) => (c.id === newCat.id ? newCat : c)) : [...prev, newCat];
+      saveCategories(updated);
+      return updated;
+    });
+    setLastSavedAt(Date.now());
+  };
+
   const handleResetCategories = () => {
     const defCats = resetCategories();
     setCategories(defCats);
@@ -671,9 +681,15 @@ export default function App() {
                 {scheduleResult && (
                   <TimelinePlan
                     scheduleResult={scheduleResult}
+                    tasks={tasks}
+                    capacity={capacity}
+                    categories={categories}
                     onToggleTask={handleToggleTask}
                     onBreakdownTask={handleBreakdownTask}
                     onStartFocusSession={handleStartFocusSession}
+                    onAddTask={handleAddTask}
+                    onEditTask={(task) => setEditingTask(task)}
+                    onDeleteTask={handleRemoveTask}
                   />
                 )}
 
@@ -710,7 +726,12 @@ export default function App() {
                   {/* Expanded Task Management */}
                   {isBrainDumpOpen && (
                     <div className="mt-5 pt-5 border-t border-stone-100 space-y-6">
-                      <TaskForm onAddTask={handleAddTask} />
+                      <TaskForm
+                        onAddTask={handleAddTask}
+                        categories={categories}
+                        onAddCategory={handleAddCategory}
+                        onOpenCategoryManager={() => setIsCategoriesOpen(true)}
+                      />
 
                       <BrainDumpList
                         tasks={tasks}
@@ -746,6 +767,9 @@ export default function App() {
                 <QuickAddTask
                   onAddTask={handleAddTask}
                   onOpenFullForm={() => setIsBrainDumpOpen(true)}
+                  categories={categories}
+                  onAddCategory={handleAddCategory}
+                  onOpenCategoryManager={() => setIsCategoriesOpen(true)}
                 />
 
                 {/* Compact Day Capacity Card */}
@@ -818,6 +842,8 @@ export default function App() {
             onSelectTask={(task) => setEditingTask(task)}
             onOpenPlanWeek={() => setIsPlanWeekOpen(true)}
             onQuickAddTask={() => setIsQuickCaptureOpen(true)}
+            onAddTask={handleAddTask}
+            categories={categories}
           />
         )}
 
@@ -831,6 +857,8 @@ export default function App() {
             onToggleTask={handleToggleTask}
             onOpenPlanMonth={() => setIsPlanMonthOpen(true)}
             onQuickAddTask={() => setIsQuickCaptureOpen(true)}
+            onAddTask={handleAddTask}
+            categories={categories}
           />
         )}
 
@@ -891,6 +919,9 @@ export default function App() {
         isOpen={isQuickCaptureOpen}
         onClose={() => setIsQuickCaptureOpen(false)}
         onAddTask={handleAddTask}
+        categories={categories}
+        onAddCategory={handleAddCategory}
+        onOpenFullForm={() => setIsBrainDumpOpen(true)}
       />
 
       <EditTaskModal
@@ -900,6 +931,9 @@ export default function App() {
         onSave={handleUpdateTask}
         onDelete={handleRemoveTask}
         onToggleComplete={handleToggleTask}
+        categories={categories}
+        onAddCategory={handleAddCategory}
+        onOpenCategoryManager={() => setIsCategoriesOpen(true)}
       />
 
       <WhatShouldIDoModal

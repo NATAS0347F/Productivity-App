@@ -37,6 +37,28 @@ export interface VisionBoardItem {
   createdAt: number;
 }
 
+export interface VisionCategory {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+  description?: string;
+  isDefault?: boolean;
+}
+
+export type VisionLayoutMode = 'masonry' | 'grid' | 'mosaic' | 'journal';
+
+export interface VisionBoardLayoutSettings {
+  mode: VisionLayoutMode;
+  columns: 2 | 3 | 4;
+  gap: 'compact' | 'normal' | 'spacious';
+  aspectRatioOverride: 'original' | 'square' | 'portrait' | 'landscape';
+  showAffirmation: boolean;
+  showCaption: boolean;
+  showLinkedGoal: boolean;
+  cardRounding: 'subtle' | 'rounded' | 'curved';
+}
+
 export type RecurrenceType =
   | 'none'
   | 'daily'

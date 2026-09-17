@@ -8,6 +8,8 @@ import {
   FolderTree,
   ChevronDown,
   ChevronUp,
+  Tag,
+  Palette,
 } from 'lucide-react';
 import {
   EnergyLevel,
@@ -16,17 +18,26 @@ import {
   CategoryType,
   RecurrenceType,
   Task,
+  CategoryDefinition,
 } from '../types';
-import { CATEGORY_CONFIG, ITEM_TYPE_CONFIG } from '../utils/categories';
+import { CATEGORY_CONFIG, ITEM_TYPE_CONFIG, DEFAULT_CATEGORIES } from '../utils/categories';
 
 interface TaskFormProps {
   onAddTask: (task: Omit<Task, 'id' | 'completed' | 'createdAt' | 'postponeCount'>) => void;
+  categories?: CategoryDefinition[];
+  onAddCategory?: (category: CategoryDefinition) => void;
+  onOpenCategoryManager?: () => void;
 }
 
-export const TaskForm: React.FC<TaskFormProps> = ({ onAddTask }) => {
+export const TaskForm: React.FC<TaskFormProps> = ({
+  onAddTask,
+  categories = DEFAULT_CATEGORIES,
+  onAddCategory,
+  onOpenCategoryManager,
+}) => {
   const [name, setName] = useState('');
   const [type, setType] = useState<ItemType>('task');
-  const [category, setCategory] = useState<CategoryType>('academic');
+  const [category, setCategory] = useState<CategoryType>(categories[0]?.id || 'academic');
   const [duration, setDuration] = useState<number>(60);
   const [energy, setEnergy] = useState<EnergyLevel>('medium');
   const [priority, setPriority] = useState<PriorityLevel>(2);
@@ -35,6 +46,33 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onAddTask }) => {
   const [customDays, setCustomDays] = useState<number[]>([1, 3, 5]); // Mon, Wed, Fri default
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Quick inline category creator
+  const [isCreatingCat, setIsCreatingCat] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatEmoji, setNewCatEmoji] = useState('🎯');
+  const [newCatColor, setNewCatColor] = useState('#8B5CF6');
+
+  const handleQuickAddCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCatName.trim()) return;
+
+    const id = 'cat_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    const newCat: CategoryDefinition = {
+      id,
+      name: newCatName.trim(),
+      emoji: newCatEmoji || '🎯',
+      color: newCatColor || '#8B5CF6',
+      isCustom: true,
+    };
+
+    if (onAddCategory) {
+      onAddCategory(newCat);
+    }
+    setCategory(id);
+    setIsCreatingCat(false);
+    setNewCatName('');
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,23 +195,112 @@ export const TaskForm: React.FC<TaskFormProps> = ({ onAddTask }) => {
         </div>
 
         {/* Category & Duration */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label htmlFor="taskCategory" className="block text-xs font-semibold text-[#54514d] mb-1">
-              Category
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="taskCategory" className="block text-xs font-semibold text-[#54514d]">
+                Category
+              </label>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingCat((prev) => !prev)}
+                  className="text-[11px] font-bold text-amber-700 hover:text-amber-900 flex items-center gap-0.5 cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>{isCreatingCat ? 'Close' : 'New'}</span>
+                </button>
+                {onOpenCategoryManager && (
+                  <>
+                    <span className="text-stone-300">·</span>
+                    <button
+                      type="button"
+                      onClick={onOpenCategoryManager}
+                      className="text-[11px] text-stone-400 hover:text-stone-600 cursor-pointer"
+                    >
+                      Manage
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Inline Quick Category Creator */}
+            {isCreatingCat && (
+              <div className="mb-2 p-2.5 bg-stone-50 border border-stone-200 rounded-xl space-y-2 animate-in fade-in duration-150">
+                <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">
+                  Create New Category
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={newCatEmoji}
+                    onChange={(e) => setNewCatEmoji(e.target.value.slice(-2))}
+                    className="w-8 h-8 text-center text-sm bg-white border border-stone-300 rounded-lg shrink-0"
+                    title="Emoji"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Category name..."
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    className="flex-1 px-2.5 py-1 text-xs bg-white border border-stone-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-amber-500 font-medium"
+                  />
+                  <input
+                    type="color"
+                    value={newCatColor}
+                    onChange={(e) => setNewCatColor(e.target.value)}
+                    className="w-7 h-7 rounded-lg cursor-pointer border border-stone-300 p-0 shrink-0"
+                    title="Pick Color"
+                  />
+                </div>
+                <div className="flex justify-end gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingCat(false)}
+                    className="px-2 py-1 text-[11px] text-stone-500 hover:text-stone-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleQuickAddCategory}
+                    disabled={!newCatName.trim()}
+                    className="px-3 py-1 text-[11px] font-bold bg-stone-900 text-white rounded-lg hover:bg-stone-800 disabled:opacity-50 cursor-pointer"
+                  >
+                    Add & Select
+                  </button>
+                </div>
+              </div>
+            )}
+
             <select
               id="taskCategory"
               value={category}
-              onChange={(e) => setCategory(e.target.value as CategoryType)}
-              className="w-full text-xs sm:text-sm border border-[#ddd9d2] rounded-xl px-2.5 py-2 bg-white text-[#242424] focus:outline-none focus:border-[#8b8175]"
+              onChange={(e) => {
+                if (e.target.value === '__add_new__') {
+                  setIsCreatingCat(true);
+                } else if (e.target.value === '__manage__' && onOpenCategoryManager) {
+                  onOpenCategoryManager();
+                } else {
+                  setCategory(e.target.value as CategoryType);
+                }
+              }}
+              className="w-full text-xs sm:text-sm border border-[#ddd9d2] rounded-xl px-2.5 py-2 bg-white text-[#242424] focus:outline-hidden focus:border-[#8b8175]"
             >
-              <option value="academic">🧠 Academic / School</option>
-              <option value="technical">💻 Technical / Coding</option>
-              <option value="career">📊 Career / Analytics</option>
-              <option value="creative">🎨 Creative</option>
-              <option value="personal">🌱 Personal</option>
-              <option value="admin">🏠 Life / Admin</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.emoji} {cat.name}
+                </option>
+              ))}
+              {!categories.some((c) => c.id === category) && category && (
+                <option value={category}>🏷️ {category}</option>
+              )}
+              <option disabled>──────────</option>
+              <option value="__add_new__">➕ + Add New Category...</option>
+              {onOpenCategoryManager && (
+                <option value="__manage__">⚙️ Manage All Categories...</option>
+              )}
             </select>
           </div>
 

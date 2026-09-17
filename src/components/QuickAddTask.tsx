@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { Plus, CornerDownLeft, Sparkles } from 'lucide-react';
-import { Task, TaskIntent } from '../types';
+import { Plus, CornerDownLeft, Sparkles, Tag } from 'lucide-react';
+import { Task, TaskIntent, CategoryDefinition } from '../types';
 import { parseNaturalLanguageTask } from '../utils/naturalLanguage';
+import { DEFAULT_CATEGORIES } from '../utils/categories';
 
 interface QuickAddTaskProps {
   onAddTask: (task: Omit<Task, 'id' | 'completed' | 'createdAt' | 'postponeCount'>) => void;
   onOpenFullForm?: () => void;
+  categories?: CategoryDefinition[];
+  onAddCategory?: (category: CategoryDefinition) => void;
+  onOpenCategoryManager?: () => void;
   placeholder?: string;
   autoFocus?: boolean;
 }
@@ -13,14 +17,40 @@ interface QuickAddTaskProps {
 export const QuickAddTask: React.FC<QuickAddTaskProps> = ({
   onAddTask,
   onOpenFullForm,
+  categories = DEFAULT_CATEGORIES,
+  onAddCategory,
+  onOpenCategoryManager,
   placeholder = 'What do you need / want to do?',
   autoFocus = false,
 }) => {
   const [rawInput, setRawInput] = useState('');
   const [manualIntent, setManualIntent] = useState<TaskIntent | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isCreatingCat, setIsCreatingCat] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatEmoji, setNewCatEmoji] = useState('🎯');
+  const [newCatColor, setNewCatColor] = useState('#8B5CF6');
 
   const parsed = parseNaturalLanguageTask(rawInput);
   const activeIntent: TaskIntent = manualIntent || parsed.intent;
+  const currentCatId = selectedCategory || parsed.category || categories[0]?.id || 'academic';
+
+  const handleQuickAddCat = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCatName.trim()) return;
+    const id = 'cat_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    const newCat: CategoryDefinition = {
+      id,
+      name: newCatName.trim(),
+      emoji: newCatEmoji || '🎯',
+      color: newCatColor || '#8B5CF6',
+      isCustom: true,
+    };
+    if (onAddCategory) onAddCategory(newCat);
+    setSelectedCategory(id);
+    setIsCreatingCat(false);
+    setNewCatName('');
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +60,7 @@ export const QuickAddTask: React.FC<QuickAddTaskProps> = ({
       name: parsed.name || rawInput.trim(),
       type: activeIntent === 'someday' ? 'idea' : 'task',
       intent: activeIntent,
-      category: parsed.category || 'academic',
+      category: currentCatId,
       duration: parsed.duration,
       energy: 'medium',
       priority: activeIntent === 'need' ? 3 : 2,
@@ -42,6 +72,7 @@ export const QuickAddTask: React.FC<QuickAddTaskProps> = ({
 
     setRawInput('');
     setManualIntent(null);
+    setSelectedCategory(null);
   };
 
   return (
@@ -92,44 +123,136 @@ export const QuickAddTask: React.FC<QuickAddTaskProps> = ({
           </button>
         </div>
 
-        {/* Intent distinction: Need to do / Want to do / Maybe someday */}
-        <div className="flex items-center justify-between gap-1 flex-wrap pt-0.5">
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setManualIntent('need')}
-              className={`px-2 py-0.5 rounded-md text-[11px] font-bold cursor-pointer transition-all ${
-                activeIntent === 'need'
-                  ? 'bg-rose-100 text-rose-800 border border-rose-200/80 shadow-2xs'
-                  : 'text-stone-400 hover:text-stone-600'
-              }`}
-            >
-              📌 Need to do
-            </button>
+        {/* Inline Quick Category Creator */}
+        {isCreatingCat && (
+          <div className="p-2.5 bg-stone-50 border border-stone-200 rounded-xl space-y-2 animate-in fade-in duration-150">
+            <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">
+              Quick Add Category
+            </span>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={newCatEmoji}
+                onChange={(e) => setNewCatEmoji(e.target.value.slice(-2))}
+                className="w-7 h-7 text-center text-xs bg-white border border-stone-300 rounded-lg shrink-0"
+                title="Emoji"
+              />
+              <input
+                type="text"
+                placeholder="Category name..."
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                className="flex-1 px-2 py-1 text-xs bg-white border border-stone-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-amber-500 font-medium"
+              />
+              <input
+                type="color"
+                value={newCatColor}
+                onChange={(e) => setNewCatColor(e.target.value)}
+                className="w-7 h-7 rounded-lg cursor-pointer border border-stone-300 p-0 shrink-0"
+                title="Color"
+              />
+            </div>
+            <div className="flex justify-end gap-1.5">
+              <button
+                type="button"
+                onClick={() => setIsCreatingCat(false)}
+                className="px-2 py-0.5 text-[11px] text-stone-500 hover:text-stone-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleQuickAddCat}
+                disabled={!newCatName.trim()}
+                className="px-2.5 py-0.5 text-[11px] font-bold bg-stone-900 text-white rounded-lg hover:bg-stone-800 disabled:opacity-50"
+              >
+                Add & Pick
+              </button>
+            </div>
+          </div>
+        )}
 
-            <button
-              type="button"
-              onClick={() => setManualIntent('want')}
-              className={`px-2 py-0.5 rounded-md text-[11px] font-bold cursor-pointer transition-all ${
-                activeIntent === 'want'
-                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200/80 shadow-2xs'
-                  : 'text-stone-400 hover:text-stone-600'
-              }`}
-            >
-              🌱 Want to do
-            </button>
+        {/* Category picker & Intent row */}
+        <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Category select pill */}
+            <div className="flex items-center gap-1 bg-stone-100/90 rounded-lg px-2 py-0.5 border border-stone-200/60 text-xs">
+              <span className="text-[10px] text-stone-400 font-bold uppercase">Cat:</span>
+              <select
+                value={currentCatId}
+                onChange={(e) => {
+                  if (e.target.value === '__new__') {
+                    setIsCreatingCat(true);
+                  } else if (e.target.value === '__manage__' && onOpenCategoryManager) {
+                    onOpenCategoryManager();
+                  } else {
+                    setSelectedCategory(e.target.value);
+                  }
+                }}
+                className="bg-transparent text-xs font-bold text-stone-700 cursor-pointer focus:outline-hidden pr-1"
+              >
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.emoji} {c.name}
+                  </option>
+                ))}
+                {!categories.some((c) => c.id === currentCatId) && currentCatId && (
+                  <option value={currentCatId}>🏷️ {currentCatId}</option>
+                )}
+                <option disabled>──────</option>
+                <option value="__new__">➕ + New Category...</option>
+                {onOpenCategoryManager && (
+                  <option value="__manage__">⚙️ Manage...</option>
+                )}
+              </select>
+              <button
+                type="button"
+                onClick={() => setIsCreatingCat((prev) => !prev)}
+                className="text-stone-400 hover:text-amber-700 font-bold text-xs"
+                title="Add new category"
+              >
+                +
+              </button>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setManualIntent('someday')}
-              className={`px-2 py-0.5 rounded-md text-[11px] font-bold cursor-pointer transition-all ${
-                activeIntent === 'someday'
-                  ? 'bg-amber-100 text-amber-800 border border-amber-200/80 shadow-2xs'
-                  : 'text-stone-400 hover:text-stone-600'
-              }`}
-            >
-              💭 Maybe someday
-            </button>
+            {/* Intent distinction: Need to do / Want to do / Maybe someday */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setManualIntent('need')}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-bold cursor-pointer transition-all ${
+                  activeIntent === 'need'
+                    ? 'bg-rose-100 text-rose-800 border border-rose-200/80 shadow-2xs'
+                    : 'text-stone-400 hover:text-stone-600'
+                }`}
+              >
+                📌 Need
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setManualIntent('want')}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-bold cursor-pointer transition-all ${
+                  activeIntent === 'want'
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200/80 shadow-2xs'
+                    : 'text-stone-400 hover:text-stone-600'
+                }`}
+              >
+                🌱 Want
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setManualIntent('someday')}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-bold cursor-pointer transition-all ${
+                  activeIntent === 'someday'
+                    ? 'bg-amber-100 text-amber-800 border border-amber-200/80 shadow-2xs'
+                    : 'text-stone-400 hover:text-stone-600'
+                }`}
+              >
+                💭 Someday
+              </button>
+            </div>
           </div>
 
           {/* Natural language detected chips */}

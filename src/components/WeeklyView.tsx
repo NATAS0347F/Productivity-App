@@ -19,10 +19,11 @@ import {
   HelpCircle,
   Plus,
 } from 'lucide-react';
-import { Task, CapacitySettings, ActivityDay, WeekPlan, AestheticCover } from '../types';
+import { Task, CapacitySettings, ActivityDay, WeekPlan, AestheticCover, CategoryDefinition } from '../types';
 import { isTaskDueOnDay, formatMinutes } from '../utils/scheduler';
 import { CATEGORY_CONFIG } from '../utils/categories';
 import { CoverModal } from './CoverModal';
+import { AddCalendarEventModal } from './AddCalendarEventModal';
 
 interface WeeklyViewProps {
   tasks: Task[];
@@ -36,6 +37,8 @@ interface WeeklyViewProps {
   onSelectTask: (task: Task) => void;
   onOpenPlanWeek?: () => void;
   onQuickAddTask?: () => void;
+  onAddTask?: (task: Omit<Task, 'id' | 'completed' | 'createdAt' | 'postponeCount'>) => void;
+  categories?: CategoryDefinition[];
 }
 
 export const WeeklyView: React.FC<WeeklyViewProps> = ({
@@ -50,11 +53,15 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
   onSelectTask,
   onOpenPlanWeek,
   onQuickAddTask,
+  onAddTask,
+  categories = [],
 }) => {
   const [isViewingNextWeek, setIsViewingNextWeek] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0);
   const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
   const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [isAddEventOpen, setIsAddEventOpen] = useState(false);
+  const [targetDateForEvent, setTargetDateForEvent] = useState<string>('');
 
   // Active plan depending on toggle
   const currentPlan = isViewingNextWeek ? nextWeekPlan : thisWeekPlan;
@@ -376,11 +383,24 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
                   {day.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                 </span>
               </div>
-              {day.isToday && (
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-400 text-stone-950">
-                  Today
-                </span>
-              )}
+              <div className="flex items-center gap-1">
+                {day.isToday && (
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-400 text-stone-950">
+                    Today
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetDateForEvent(day.date.toISOString().slice(0, 10));
+                    setIsAddEventOpen(true);
+                  }}
+                  className="p-1 rounded-md text-stone-400 hover:text-stone-900 hover:bg-stone-200/70 transition-colors"
+                  title={`Add event for ${day.dayName}`}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             {/* Workload Indicator */}
@@ -546,6 +566,19 @@ export const WeeklyView: React.FC<WeeklyViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Add Calendar Event Modal */}
+      <AddCalendarEventModal
+        isOpen={isAddEventOpen}
+        onClose={() => setIsAddEventOpen(false)}
+        onAddEvent={(taskData) => {
+          if (onAddTask) {
+            onAddTask(taskData);
+          }
+        }}
+        initialDate={targetDateForEvent}
+        categories={categories}
+      />
 
       {/* Cover Customizer Modal */}
       <CoverModal

@@ -1,8 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   VisionBoardItem,
   BigPictureGoal,
   CategoryDefinition,
+  VisionCategory,
+  VisionBoardLayoutSettings,
+  VisionLayoutMode,
 } from '../types';
 import {
   Sparkles,
@@ -19,8 +22,25 @@ import {
   X,
   Heart,
   Compass,
+  LayoutGrid,
+  Sliders,
+  Tag,
+  Grid3X3,
+  Columns,
+  BookOpen,
 } from 'lucide-react';
 import { compressImageFile } from '../utils/theme';
+import {
+  loadVisionCategories,
+  saveVisionCategories,
+  resetVisionCategories,
+  loadVisionLayout,
+  saveVisionLayout,
+  resetVisionLayout,
+} from '../utils/storage';
+import { VisionCategoryModal } from './VisionCategoryModal';
+import { VisionLayoutModal } from './VisionLayoutModal';
+import { playRelaxingClick, playTabSound } from '../utils/sound';
 
 interface VisionBoardViewProps {
   items: VisionBoardItem[];
@@ -28,16 +48,6 @@ interface VisionBoardViewProps {
   bigPictureGoals: BigPictureGoal[];
   categories: CategoryDefinition[];
 }
-
-const VISION_CATEGORIES = [
-  'All',
-  'Mindset & Mood',
-  'Career & Ambition',
-  'Aesthetic & Life',
-  'Health & Wellness',
-  'Dream Projects',
-  'Travel & Adventure',
-];
 
 const CURATED_AESTHETIC_PHOTOS = [
   {
@@ -88,20 +98,30 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
   items,
   onSaveItems,
   bigPictureGoals,
-  categories,
+  categories: globalCategories,
 }) => {
+  // Categories and Layout State
+  const [visionCategories, setVisionCategories] = useState<VisionCategory[]>(() =>
+    loadVisionCategories()
+  );
+  const [layout, setLayout] = useState<VisionBoardLayoutSettings>(() => loadVisionLayout());
+
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<VisionBoardItem | null>(null);
 
   // Form state
   const [formTitle, setFormTitle] = useState('');
   const [formCaption, setFormCaption] = useState('');
   const [formImageUrl, setFormImageUrl] = useState('');
-  const [formCategory, setFormCategory] = useState('Mindset & Mood');
+  const [formCategory, setFormCategory] = useState('');
   const [formAffirmation, setFormAffirmation] = useState('');
   const [formLinkedGoal, setFormLinkedGoal] = useState('');
-  const [formAspectRatio, setFormAspectRatio] = useState<'portrait' | 'square' | 'landscape'>('portrait');
+  const [formAspectRatio, setFormAspectRatio] = useState<'portrait' | 'square' | 'landscape'>(
+    'portrait'
+  );
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -110,6 +130,49 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
+
+  // Sync category changes
+  const handleSaveVisionCategories = (newCategories: VisionCategory[]) => {
+    setVisionCategories(newCategories);
+    saveVisionCategories(newCategories);
+    showToast('Categories updated');
+  };
+
+  const handleResetVisionCategories = () => {
+    const defaults = resetVisionCategories();
+    setVisionCategories(defaults);
+    showToast('Reset categories to default');
+  };
+
+  const handleUpdateItemCategoryNames = (oldName: string, newName: string) => {
+    const updated = items.map((it) =>
+      it.category === oldName ? { ...it, category: newName } : it
+    );
+    onSaveItems(updated);
+  };
+
+  // Sync layout changes
+  const handleSaveLayout = (newLayout: VisionBoardLayoutSettings) => {
+    setLayout(newLayout);
+    saveVisionLayout(newLayout);
+    showToast('Layout updated');
+  };
+
+  const handleResetLayout = () => {
+    const defaults = resetVisionLayout();
+    setLayout(defaults);
+    showToast('Reset layout to default');
+  };
+
+  // When selectedCategory is no longer valid, switch back to 'All'
+  useEffect(() => {
+    if (
+      selectedCategory !== 'All' &&
+      !visionCategories.some((c) => c.name === selectedCategory)
+    ) {
+      setSelectedCategory('All');
+    }
+  }, [visionCategories, selectedCategory]);
 
   const filteredItems = items
     .filter((item) => {
@@ -128,7 +191,7 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
     setFormTitle('');
     setFormCaption('');
     setFormImageUrl(CURATED_AESTHETIC_PHOTOS[0].url);
-    setFormCategory('Mindset & Mood');
+    setFormCategory(visionCategories[0]?.name || 'Mindset & Mood');
     setFormAffirmation('');
     setFormLinkedGoal('');
     setFormAspectRatio('portrait');
@@ -140,7 +203,7 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
     setFormTitle(item.title);
     setFormCaption(item.caption || '');
     setFormImageUrl(item.imageUrl);
-    setFormCategory(item.category || 'Mindset & Mood');
+    setFormCategory(item.category || visionCategories[0]?.name || 'Mindset & Mood');
     setFormAffirmation(item.affirmation || '');
     setFormLinkedGoal(item.linkedGoalId || '');
     setFormAspectRatio(item.aspectRatio || 'portrait');
@@ -166,6 +229,8 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
     e.preventDefault();
     if (!formTitle.trim()) return;
 
+    const chosenCategory = formCategory || visionCategories[0]?.name || 'Mindset & Mood';
+
     if (editingItem) {
       const updated = items.map((item) =>
         item.id === editingItem.id
@@ -174,7 +239,7 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
               title: formTitle.trim(),
               caption: formCaption.trim() || undefined,
               imageUrl: formImageUrl.trim() || CURATED_AESTHETIC_PHOTOS[0].url,
-              category: formCategory,
+              category: chosenCategory,
               affirmation: formAffirmation.trim() || undefined,
               linkedGoalId: formLinkedGoal || undefined,
               aspectRatio: formAspectRatio,
@@ -189,7 +254,7 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
         title: formTitle.trim(),
         caption: formCaption.trim() || undefined,
         imageUrl: formImageUrl.trim() || CURATED_AESTHETIC_PHOTOS[0].url,
-        category: formCategory,
+        category: chosenCategory,
         affirmation: formAffirmation.trim() || undefined,
         linkedGoalId: formLinkedGoal || undefined,
         aspectRatio: formAspectRatio,
@@ -234,6 +299,20 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
     showToast('Loaded aesthetic starter cards');
   };
 
+  // Helper classes for rounding
+  const roundingClass =
+    layout.cardRounding === 'subtle'
+      ? 'rounded-xl'
+      : layout.cardRounding === 'curved'
+      ? 'rounded-3xl'
+      : 'rounded-2xl';
+
+  // Helper classes for gap spacing
+  const gapClass =
+    layout.gap === 'compact' ? 'gap-3.5' : layout.gap === 'spacious' ? 'gap-7' : 'gap-5';
+  const spaceYClass =
+    layout.gap === 'compact' ? 'space-y-3.5' : layout.gap === 'spacious' ? 'space-y-7' : 'space-y-5';
+
   return (
     <div id="vision-board-page" className="space-y-6 pb-12 animate-in fade-in duration-200">
       {/* Toast */}
@@ -249,7 +328,7 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
         id="vision-board-header"
         className="p-6 sm:p-8 rounded-2xl border border-stone-200/90 dark:border-stone-800 bg-white/80 dark:bg-stone-900/80 backdrop-blur-md shadow-2xs transition-colors"
       >
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           <div>
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-1.5">
@@ -268,11 +347,96 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          {/* Controls: Layout, Categories, Add Tile */}
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+            {/* Quick Layout Mode Buttons */}
+            <div className="flex items-center bg-stone-100 dark:bg-stone-800 p-1 rounded-xl border border-stone-200/80 dark:border-stone-700">
+              <button
+                type="button"
+                onClick={() => handleSaveLayout({ ...layout, mode: 'masonry' })}
+                className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
+                  layout.mode === 'masonry'
+                    ? 'bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-2xs'
+                    : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-white'
+                }`}
+                title="Masonry Collage"
+              >
+                <Columns className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveLayout({ ...layout, mode: 'grid' })}
+                className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
+                  layout.mode === 'grid'
+                    ? 'bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-2xs'
+                    : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-white'
+                }`}
+                title="Uniform Grid"
+              >
+                <Grid3X3 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveLayout({ ...layout, mode: 'mosaic' })}
+                className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
+                  layout.mode === 'mosaic'
+                    ? 'bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-2xs'
+                    : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-white'
+                }`}
+                title="Editorial Mosaic"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveLayout({ ...layout, mode: 'journal' })}
+                className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
+                  layout.mode === 'journal'
+                    ? 'bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-2xs'
+                    : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-white'
+                }`}
+                title="Journal Cards"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Layout Customizer Button */}
+            <button
+              id="btn-edit-vision-layout"
+              type="button"
+              onClick={() => {
+                playRelaxingClick();
+                setIsLayoutModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 text-xs font-bold border border-stone-200/80 dark:border-stone-700 transition-all cursor-pointer"
+            >
+              <Sliders className="w-3.5 h-3.5" />
+              <span>Layout</span>
+            </button>
+
+            {/* Edit Categories Button */}
+            <button
+              id="btn-edit-vision-categories"
+              type="button"
+              onClick={() => {
+                playRelaxingClick();
+                setIsCategoryModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 text-xs font-bold border border-stone-200/80 dark:border-stone-700 transition-all cursor-pointer"
+            >
+              <Tag className="w-3.5 h-3.5" />
+              <span>Categories</span>
+            </button>
+
+            {/* Add Vision Card Button */}
             <button
               id="btn-add-vision-card"
-              onClick={handleOpenAdd}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-stone-100 dark:hover:bg-stone-200 text-white dark:text-stone-900 text-xs font-bold shadow-xs cursor-pointer transition-all"
+              onClick={() => {
+                playRelaxingClick();
+                handleOpenAdd();
+              }}
+              className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 dark:bg-stone-100 dark:hover:bg-stone-200 text-white dark:text-stone-900 text-xs font-bold shadow-xs cursor-pointer transition-all"
             >
               <Plus className="w-4 h-4" />
               <span>+ Add Vision Tile</span>
@@ -282,19 +446,50 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
 
         {/* Category Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pt-6 border-t border-stone-100 dark:border-stone-800/80 mt-6 no-scrollbar">
-          {VISION_CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                selectedCategory === cat
-                  ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 shadow-2xs'
-                  : 'text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-white bg-stone-100/60 dark:bg-stone-800/40 hover:bg-stone-200/60'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+          <button
+            onClick={() => {
+              playTabSound();
+              setSelectedCategory('All');
+            }}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+              selectedCategory === 'All'
+                ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 shadow-2xs'
+                : 'text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-white bg-stone-100/60 dark:bg-stone-800/40 hover:bg-stone-200/60'
+            }`}
+          >
+            All ({items.length})
+          </button>
+
+          {visionCategories.map((cat) => {
+            const count = items.filter((it) => it.category === cat.name).length;
+            const isSelected = selectedCategory === cat.name;
+
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.name)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 shadow-2xs'
+                    : 'text-stone-600 hover:text-stone-900 dark:text-stone-300 dark:hover:text-white bg-stone-100/60 dark:bg-stone-800/40 hover:bg-stone-200/60'
+                }`}
+              >
+                <span>{cat.emoji}</span>
+                <span>{cat.name}</span>
+                <span className="text-[10px] opacity-60 font-mono">({count})</span>
+              </button>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={() => setIsCategoryModalOpen(true)}
+            className="px-2.5 py-1.5 rounded-full text-xs font-bold text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center gap-1 transition-colors shrink-0"
+            title="Manage categories"
+          >
+            <Plus className="w-3 h-3" />
+            <span>Edit Categories</span>
+          </button>
         </div>
       </div>
 
@@ -323,16 +518,107 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
             </button>
           </div>
         </div>
-      ) : (
-        <div className="columns-1 sm:columns-2 lg:columns-3 gap-5 space-y-5">
+      ) : layout.mode === 'journal' ? (
+        /* Journal Cards Layout (Horizontal Widescreen Editorial Cards) */
+        <div className={`max-w-4xl mx-auto ${spaceYClass}`}>
           {filteredItems.map((item) => {
             const linkedGoal = bigPictureGoals.find((g) => g.id === item.linkedGoalId);
+            const catObj = visionCategories.find((c) => c.name === item.category);
 
             return (
               <div
                 key={item.id}
                 onClick={() => handleOpenEdit(item)}
-                className="break-inside-avoid rounded-2xl overflow-hidden border border-stone-200/90 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-2xs hover:shadow-md transition-all group cursor-pointer relative"
+                className={`overflow-hidden border border-stone-200/90 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-2xs hover:shadow-md transition-all group cursor-pointer ${roundingClass} flex flex-col sm:flex-row`}
+              >
+                {/* Photo Left/Top */}
+                <div className="sm:w-2/5 min-h-[200px] relative overflow-hidden bg-stone-100 dark:bg-stone-800 shrink-0">
+                  <img
+                    src={item.imageUrl}
+                    alt={item.title}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-103"
+                    loading="lazy"
+                  />
+                  <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur-md text-white border border-white/20">
+                      {catObj?.emoji} {item.category}
+                    </span>
+                  </div>
+
+                  <div className="absolute top-3 right-3 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={(e) => handleTogglePin(item.id, e)}
+                      className={`p-1.5 rounded-full backdrop-blur-md transition-all ${
+                        item.isPinned
+                          ? 'bg-amber-500 text-white shadow-xs'
+                          : 'bg-black/40 text-white/80 hover:bg-black/60'
+                      }`}
+                      title={item.isPinned ? 'Unpin' : 'Pin to top'}
+                    >
+                      <Pin className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDelete(item.id, e)}
+                      className="p-1.5 rounded-full bg-black/40 text-white/80 hover:bg-rose-600 hover:text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all"
+                      title="Delete Card"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Content Right */}
+                <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-black text-stone-900 dark:text-stone-100 leading-snug">
+                      {item.title}
+                    </h3>
+
+                    {layout.showAffirmation && item.affirmation && (
+                      <div className="mt-3 p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/50">
+                        <p className="text-xs sm:text-sm italic font-medium text-amber-950 dark:text-amber-200 font-serif leading-relaxed">
+                          "{item.affirmation}"
+                        </p>
+                      </div>
+                    )}
+
+                    {layout.showCaption && item.caption && (
+                      <p className="text-xs text-stone-600 dark:text-stone-400 mt-3 leading-relaxed">
+                        {item.caption}
+                      </p>
+                    )}
+                  </div>
+
+                  {layout.showLinkedGoal && linkedGoal && (
+                    <div className="pt-3 border-t border-stone-100 dark:border-stone-800 flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                      <Target className="w-4 h-4" />
+                      <span>Connected Goal: {linkedGoal.title}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : layout.mode === 'mosaic' ? (
+        /* Editorial Mosaic Layout */
+        <div
+          className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${gapClass}`}
+        >
+          {filteredItems.map((item, index) => {
+            const linkedGoal = bigPictureGoals.find((g) => g.id === item.linkedGoalId);
+            const catObj = visionCategories.find((c) => c.name === item.category);
+            const isHero = index === 0 || item.isPinned;
+
+            return (
+              <div
+                key={item.id}
+                onClick={() => handleOpenEdit(item)}
+                className={`overflow-hidden border border-stone-200/90 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-2xs hover:shadow-md transition-all group cursor-pointer relative flex flex-col justify-between ${roundingClass} ${
+                  isHero ? 'sm:col-span-2 lg:col-span-2' : ''
+                }`}
               >
                 {/* Photo container */}
                 <div className="relative overflow-hidden bg-stone-100 dark:bg-stone-800">
@@ -341,7 +627,229 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
                     alt={item.title}
                     className="w-full object-cover transition-transform duration-500 group-hover:scale-103"
                     style={{
-                      maxHeight: item.aspectRatio === 'landscape' ? '220px' : item.aspectRatio === 'square' ? '300px' : '420px',
+                      height: isHero ? '320px' : '200px',
+                    }}
+                    loading="lazy"
+                  />
+
+                  {/* Badges / Overlays */}
+                  <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none">
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur-md text-white border border-white/20 flex items-center gap-1">
+                      <span>{catObj?.emoji}</span>
+                      <span>{item.category}</span>
+                    </span>
+
+                    <div className="flex items-center gap-1 pointer-events-auto">
+                      <button
+                        type="button"
+                        onClick={(e) => handleTogglePin(item.id, e)}
+                        className={`p-1.5 rounded-full backdrop-blur-md transition-all ${
+                          item.isPinned
+                            ? 'bg-amber-500 text-white shadow-xs'
+                            : 'bg-black/40 text-white/80 hover:bg-black/60'
+                        }`}
+                        title={item.isPinned ? 'Unpin' : 'Pin to top'}
+                      >
+                        <Pin className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => handleDelete(item.id, e)}
+                        className="p-1.5 rounded-full bg-black/40 text-white/80 hover:bg-rose-600 hover:text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all"
+                        title="Delete Card"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
+                  <div>
+                    <h3 className={`font-bold text-stone-900 dark:text-stone-100 leading-snug ${isHero ? 'text-base sm:text-lg' : 'text-sm'}`}>
+                      {item.title}
+                    </h3>
+
+                    {layout.showAffirmation && item.affirmation && (
+                      <div className="p-2.5 rounded-xl bg-stone-50 dark:bg-stone-800/60 border border-stone-100 dark:border-stone-800/80 mt-2">
+                        <p className="text-xs italic text-stone-700 dark:text-stone-300 font-medium">
+                          "{item.affirmation}"
+                        </p>
+                      </div>
+                    )}
+
+                    {layout.showCaption && item.caption && (
+                      <p className="text-xs text-stone-500 dark:text-stone-400 line-clamp-2 mt-1">
+                        {item.caption}
+                      </p>
+                    )}
+                  </div>
+
+                  {layout.showLinkedGoal && linkedGoal && (
+                    <div className="pt-2 flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                      <Target className="w-3.5 h-3.5" />
+                      <span>Linked: {linkedGoal.title}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : layout.mode === 'grid' ? (
+        /* Uniform Grid Layout */
+        <div
+          className={`grid grid-cols-1 ${
+            layout.columns === 2
+              ? 'sm:grid-cols-2'
+              : layout.columns === 4
+              ? 'sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'
+              : 'sm:grid-cols-2 lg:grid-cols-3'
+          } ${gapClass}`}
+        >
+          {filteredItems.map((item) => {
+            const linkedGoal = bigPictureGoals.find((g) => g.id === item.linkedGoalId);
+            const catObj = visionCategories.find((c) => c.name === item.category);
+
+            // Aspect ratio calculation
+            const aspectClass =
+              layout.aspectRatioOverride === 'square'
+                ? 'aspect-square'
+                : layout.aspectRatioOverride === 'portrait'
+                ? 'aspect-[3/4]'
+                : layout.aspectRatioOverride === 'landscape'
+                ? 'aspect-[16/9]'
+                : item.aspectRatio === 'landscape'
+                ? 'aspect-[16/9]'
+                : item.aspectRatio === 'square'
+                ? 'aspect-square'
+                : 'aspect-[3/4]';
+
+            return (
+              <div
+                key={item.id}
+                onClick={() => handleOpenEdit(item)}
+                className={`overflow-hidden border border-stone-200/90 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-2xs hover:shadow-md transition-all group cursor-pointer relative flex flex-col justify-between ${roundingClass}`}
+              >
+                {/* Photo container */}
+                <div className={`relative overflow-hidden bg-stone-100 dark:bg-stone-800 ${aspectClass}`}>
+                  <img
+                    src={item.imageUrl}
+                    alt={item.title}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-103"
+                    loading="lazy"
+                  />
+
+                  {/* Badges / Overlays */}
+                  <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none">
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur-md text-white border border-white/20 flex items-center gap-1">
+                      <span>{catObj?.emoji}</span>
+                      <span>{item.category}</span>
+                    </span>
+
+                    <div className="flex items-center gap-1 pointer-events-auto">
+                      <button
+                        type="button"
+                        onClick={(e) => handleTogglePin(item.id, e)}
+                        className={`p-1.5 rounded-full backdrop-blur-md transition-all ${
+                          item.isPinned
+                            ? 'bg-amber-500 text-white shadow-xs'
+                            : 'bg-black/40 text-white/80 hover:bg-black/60'
+                        }`}
+                        title={item.isPinned ? 'Unpin' : 'Pin to top'}
+                      >
+                        <Pin className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => handleDelete(item.id, e)}
+                        className="p-1.5 rounded-full bg-black/40 text-white/80 hover:bg-rose-600 hover:text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all"
+                        title="Delete Card"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-stone-900 dark:text-stone-100 leading-snug">
+                      {item.title}
+                    </h3>
+
+                    {layout.showAffirmation && item.affirmation && (
+                      <div className="p-2.5 rounded-xl bg-stone-50 dark:bg-stone-800/60 border border-stone-100 dark:border-stone-800/80 mt-2">
+                        <p className="text-xs italic text-stone-700 dark:text-stone-300 font-medium">
+                          "{item.affirmation}"
+                        </p>
+                      </div>
+                    )}
+
+                    {layout.showCaption && item.caption && (
+                      <p className="text-xs text-stone-500 dark:text-stone-400 line-clamp-2 mt-1">
+                        {item.caption}
+                      </p>
+                    )}
+                  </div>
+
+                  {layout.showLinkedGoal && linkedGoal && (
+                    <div className="pt-2 flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                      <Target className="w-3.5 h-3.5" />
+                      <span>Linked: {linkedGoal.title}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Masonry Flow Layout (Default Pinterest Style) */
+        <div
+          className={`columns-1 ${
+            layout.columns === 2
+              ? 'sm:columns-2'
+              : layout.columns === 4
+              ? 'sm:columns-2 md:columns-3 lg:columns-4'
+              : 'sm:columns-2 lg:columns-3'
+          } ${gapClass} ${spaceYClass}`}
+        >
+          {filteredItems.map((item) => {
+            const linkedGoal = bigPictureGoals.find((g) => g.id === item.linkedGoalId);
+            const catObj = visionCategories.find((c) => c.name === item.category);
+
+            const maxHeight =
+              layout.aspectRatioOverride === 'landscape'
+                ? '200px'
+                : layout.aspectRatioOverride === 'square'
+                ? '300px'
+                : layout.aspectRatioOverride === 'portrait'
+                ? '420px'
+                : item.aspectRatio === 'landscape'
+                ? '220px'
+                : item.aspectRatio === 'square'
+                ? '300px'
+                : '420px';
+
+            return (
+              <div
+                key={item.id}
+                onClick={() => handleOpenEdit(item)}
+                className={`break-inside-avoid overflow-hidden border border-stone-200/90 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-2xs hover:shadow-md transition-all group cursor-pointer relative ${roundingClass}`}
+              >
+                {/* Photo container */}
+                <div className="relative overflow-hidden bg-stone-100 dark:bg-stone-800">
+                  <img
+                    src={item.imageUrl}
+                    alt={item.title}
+                    className="w-full object-cover transition-transform duration-500 group-hover:scale-103"
+                    style={{
+                      maxHeight,
                       minHeight: '160px',
                     }}
                     loading="lazy"
@@ -349,8 +857,9 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
 
                   {/* Badges / Overlays */}
                   <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none">
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur-md text-white border border-white/20">
-                      {item.category}
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur-md text-white border border-white/20 flex items-center gap-1">
+                      <span>{catObj?.emoji}</span>
+                      <span>{item.category}</span>
                     </span>
 
                     <div className="flex items-center gap-1 pointer-events-auto">
@@ -385,7 +894,7 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
                     {item.title}
                   </h3>
 
-                  {item.affirmation && (
+                  {layout.showAffirmation && item.affirmation && (
                     <div className="p-2.5 rounded-xl bg-stone-50 dark:bg-stone-800/60 border border-stone-100 dark:border-stone-800/80">
                       <p className="text-xs italic text-stone-700 dark:text-stone-300 font-medium">
                         "{item.affirmation}"
@@ -393,13 +902,13 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
                     </div>
                   )}
 
-                  {item.caption && (
+                  {layout.showCaption && item.caption && (
                     <p className="text-xs text-stone-500 dark:text-stone-400 line-clamp-3">
                       {item.caption}
                     </p>
                   )}
 
-                  {linkedGoal && (
+                  {layout.showLinkedGoal && linkedGoal && (
                     <div className="pt-2 flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
                       <Target className="w-3.5 h-3.5" />
                       <span>Linked: {linkedGoal.title}</span>
@@ -448,52 +957,51 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
                   Vision Photography / Artwork *
                 </label>
 
-                {/* Preview Box */}
-                <div className="relative h-44 rounded-xl overflow-hidden bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 mb-2">
+                <div className="relative h-44 rounded-xl overflow-hidden bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 mb-3">
                   <img
-                    src={formImageUrl}
+                    src={formImageUrl || CURATED_AESTHETIC_PHOTOS[0].url}
                     alt="Preview"
                     className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = CURATED_AESTHETIC_PHOTOS[0].url;
-                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-3">
-                    <span className="text-xs text-white/90 font-medium">Live Visual Preview</span>
+                    <span className="text-white text-xs font-bold tracking-wide">
+                      {formTitle || 'Untitled Vision Anchor'}
+                    </span>
                   </div>
                 </div>
 
-                {/* Image URL input + Upload Button */}
-                <div className="grid grid-cols-[1fr_auto] gap-2">
+                <div className="flex items-center gap-2 mb-3">
                   <input
                     type="url"
-                    required
-                    placeholder="Paste image URL (Unsplash, etc.)"
+                    placeholder="Paste image web URL..."
                     value={formImageUrl}
                     onChange={(e) => setFormImageUrl(e.target.value)}
-                    className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                    className="flex-1 px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl text-xs focus:outline-hidden focus:ring-2 focus:ring-amber-500"
+                  />
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
                   />
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-2 bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-stone-300 dark:border-stone-700 cursor-pointer"
+                    className="px-3 py-2 bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                   >
                     <Upload className="w-3.5 h-3.5" />
                     <span>Upload</span>
                   </button>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileUpload}
-                    accept="image/*"
-                    className="sr-only"
-                  />
                 </div>
 
-                {/* Quick Curated Pickers */}
-                <div className="mt-2">
-                  <span className="text-[10px] text-stone-400 block mb-1">Or pick aesthetic photography:</span>
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                {/* Quick curated aesthetics thumbnail strip */}
+                <div>
+                  <span className="block text-[11px] font-bold text-stone-400 uppercase tracking-wider mb-1.5">
+                    Or select curated aesthetic inspiration:
+                  </span>
+                  <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
                     {CURATED_AESTHETIC_PHOTOS.map((p) => (
                       <button
                         key={p.title}
@@ -545,17 +1053,26 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
               {/* Category + Aspect Ratio */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-400 mb-1">
-                    Life Area / Category
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-stone-400">
+                      Category
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsCategoryModalOpen(true)}
+                      className="text-[10px] font-bold text-stone-400 hover:text-stone-700 dark:hover:text-white"
+                    >
+                      + Manage
+                    </button>
+                  </div>
                   <select
                     value={formCategory}
                     onChange={(e) => setFormCategory(e.target.value)}
                     className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-amber-500"
                   >
-                    {VISION_CATEGORIES.filter((c) => c !== 'All').map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
+                    {visionCategories.map((cat) => (
+                      <option key={cat.id} value={cat.name}>
+                        {cat.emoji} {cat.name}
                       </option>
                     ))}
                   </select>
@@ -630,6 +1147,26 @@ export const VisionBoardView: React.FC<VisionBoardViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Category Manager Modal */}
+      <VisionCategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        categories={visionCategories}
+        onSaveCategories={handleSaveVisionCategories}
+        visionItems={items}
+        onUpdateItemCategoryNames={handleUpdateItemCategoryNames}
+        onResetCategories={handleResetVisionCategories}
+      />
+
+      {/* Layout Customizer Modal */}
+      <VisionLayoutModal
+        isOpen={isLayoutModalOpen}
+        onClose={() => setIsLayoutModalOpen(false)}
+        layout={layout}
+        onChangeLayout={handleSaveLayout}
+        onResetLayout={handleResetLayout}
+      />
     </div>
   );
 };

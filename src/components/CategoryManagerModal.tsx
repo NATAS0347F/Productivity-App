@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CategoryDefinition } from '../types';
 import {
   X,
@@ -48,6 +48,10 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
 
   const [list, setList] = useState<CategoryDefinition[]>(categories);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setList(categories);
+  }, [categories, isOpen]);
 
   // New category form
   const [isAddingNew, setIsAddingNew] = useState(false);
